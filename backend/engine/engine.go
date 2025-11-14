@@ -39,6 +39,11 @@ func (we *WorkflowEngine) ExecuteWorkflow(workflowID string, initialContext map[
 		Context:    initialContext,
 	}
 
+	// Initialize Context map if nil to prevent nil map assignment panic
+	if execution.Context == nil {
+		execution.Context = make(map[string]interface{})
+	}
+
 	if err := we.db.CreateExecution(execution); err != nil {
 		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
