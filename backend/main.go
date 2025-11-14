@@ -10,6 +10,7 @@ import (
 	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/engine"
 	"github.com/workflow-orchestration/backend/handlers"
+	"github.com/workflow-orchestration/backend/utils"
 	ws "github.com/workflow-orchestration/backend/websocket"
 )
 
@@ -28,12 +29,22 @@ func main() {
 
 	anthropicAPIKey := os.Getenv("ANTHROPIC_API_KEY")
 
+	// Initialize encryption
+	if err := utils.InitEncryption(); err != nil {
+		log.Fatalf("Failed to initialize encryption: %v", err)
+	}
+
 	// Initialize database
 	db, err := database.NewFromEnv()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
+
+	// Seed workflow templates
+	if err := db.SeedTemplates(); err != nil {
+		log.Printf("Warning: Failed to seed templates: %v", err)
+	}
 
 	// Initialize workflow engine
 	workflowEngine := engine.NewWorkflowEngine(db, anthropicAPIKey)
@@ -84,6 +95,31 @@ func main() {
 			workflows.POST("/:id/execute", handler.ExecuteWorkflow)
 			workflows.GET("/:id/executions", handler.GetWorkflowExecutions)
 			workflows.GET("/:id/executions/:executionId", handler.GetExecutionDetails)
+		}
+
+		// Proxy all credentials requests to credentials service
+		credentials := api.Group("/credentials")
+		{
+			credentials.Any("", handler.ProxyToCredentialsService)
+			credentials.Any("/:id", handler.ProxyToCredentialsService)
+		}
+
+		templates := api.Group("/templates")
+		{
+			templates.GET("", handler.GetAllWorkflowTemplates)
+			templates.GET("/:id", handler.GetWorkflowTemplate)
+			templates.POST("", handler.CreateWorkflowTemplate)
+			templates.PUT("/:id", handler.UpdateWorkflowTemplate)
+			templates.DELETE("/:id", handler.DeleteWorkflowTemplate)
+			templates.POST("/:id/create-workflow", handler.CreateWorkflowFromTemplate)
+		}
+
+		// Log query endpoints (ClickHouse)
+		logs := api.Group("/logs")
+		{
+			logs.GET("/executions", handler.GetExecutionLogs)
+			logs.GET("/nodes/:execution_id", handler.GetNodeExecutions)
+			logs.GET("/workflows/:workflow_id", handler.GetWorkflowExecutionLogs)
 		}
 	}
 

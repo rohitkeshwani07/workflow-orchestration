@@ -3,6 +3,10 @@ import Layout from './components/Layout';
 import WorkflowList from './pages/WorkflowList';
 import WorkflowEditor from './pages/WorkflowEditor';
 import ChatInterface from './pages/ChatInterface';
+import CredentialsPage from './pages/CredentialsPage';
+import TemplatesPage from './pages/TemplatesPage';
+import ExecutionLogsPage from './pages/ExecutionLogsPage';
+import ExecutionDetailsPage from './pages/ExecutionDetailsPage';
 
 function App() {
   return (
@@ -11,7 +15,11 @@ function App() {
         <Route index element={<Navigate to="/workflows" replace />} />
         <Route path="workflows" element={<WorkflowList />} />
         <Route path="workflows/:id" element={<WorkflowEditor />} />
+        <Route path="workflows/:id/executions" element={<ExecutionLogsPage />} />
+        <Route path="workflows/:id/executions/:executionId" element={<ExecutionDetailsPage />} />
         <Route path="chat/:workflowId" element={<ChatInterface />} />
+        <Route path="credentials" element={<CredentialsPage />} />
+        <Route path="templates" element={<TemplatesPage />} />
       </Route>
     </Routes>
   );

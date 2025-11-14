@@ -113,3 +113,55 @@ export interface APIResponse<T = any> {
   data?: T;
   error?: string;
 }
+
+// ClickHouse Execution Logs Types
+export interface ExecutionLog {
+  execution_id: string;
+  workflow_id: string;
+  node_id?: string;
+  timestamp: string;
+  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+  metadata?: Record<string, any>;
+  status?: string;
+  error?: string;
+  duration_ms?: number;
+}
+
+export interface NodeExecutionLog {
+  id: string;
+  execution_id: string;
+  workflow_id: string;
+  node_id: string;
+  node_type: string;
+  status: 'running' | 'success' | 'error' | 'skipped';
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface WorkflowExecutionLog {
+  execution_id: string;
+  workflow_id: string;
+  status: 'running' | 'success' | 'error';
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  total_nodes: number;
+  successful_nodes: number;
+  failed_nodes: number;
+  skipped_nodes: number;
+  error?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface LogFilters {
+  execution_id?: string;
+  workflow_id?: string;
+  level?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+  limit?: number;
+}

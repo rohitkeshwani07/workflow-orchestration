@@ -1,5 +1,12 @@
 import axios from 'axios';
-import { Workflow, Execution } from '@workflow/shared';
+import {
+  Workflow,
+  Execution,
+  ExecutionLog,
+  NodeExecutionLog,
+  WorkflowExecutionLog,
+  LogFilters
+} from '@workflow/shared';
 
 const api = axios.create({
   baseURL: '/api'
@@ -14,5 +21,13 @@ export const workflowApi = {
   execute: (id: string, context?: any) => api.post<{ data: Execution }>(`/workflows/${id}/execute`, { context }),
   getExecutions: (id: string) => api.get<{ data: Execution[] }>(`/workflows/${id}/executions`),
   getExecutionDetails: (workflowId: string, executionId: string) =>
-    api.get<{ data: { execution: Execution, logs: any[] } }>(`/workflows/${workflowId}/executions/${executionId}`)
+    api.get<{ data: { execution: Execution, logs: any[] } }>(`/workflows/${workflowId}/executions/${executionId}`),
+
+  // ClickHouse Execution Logs APIs
+  getExecutionLogs: (filters: LogFilters) =>
+    api.get<{ data: ExecutionLog[] }>('/logs/executions', { params: filters }),
+  getNodeExecutions: (executionId: string) =>
+    api.get<{ data: NodeExecutionLog[] }>(`/logs/nodes/${executionId}`),
+  getWorkflowExecutionHistory: (workflowId: string) =>
+    api.get<{ data: WorkflowExecutionLog[] }>(`/logs/workflows/${workflowId}`)
 };

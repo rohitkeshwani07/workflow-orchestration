@@ -19,7 +19,7 @@ import { Node, Edge, NodeType } from '@workflow/shared';
 import CustomNode from '../components/nodes/CustomNode';
 import NodeConfigPanel from '../components/NodeConfigPanel';
 import NodePalette from '../components/NodePalette';
-import { Save, Play, MessageSquare } from 'lucide-react';
+import { Save, Play, MessageSquare, ClipboardList } from 'lucide-react';
 
 const nodeTypes = {
   [NodeType.CHAT_TRIGGER]: CustomNode,
@@ -138,6 +138,13 @@ export default function WorkflowEditor() {
           className="text-xl font-bold border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2"
         />
         <div className="flex gap-2">
+          <button
+            onClick={() => navigate(`/workflows/${id}/executions`)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <ClipboardList className="mr-2 h-4 w-4" />
+            View Logs
+          </button>
           <button
             onClick={() => navigate(`/chat/${id}`)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"

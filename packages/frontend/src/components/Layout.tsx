@@ -1,4 +1,4 @@
-import { Workflow } from 'lucide-react';
+import { Workflow, Key, LayoutTemplate } from 'lucide-react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
 export default function Layout() {
@@ -22,7 +22,28 @@ export default function Layout() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
+                  <Workflow className="w-4 h-4 mr-2" />
                   Workflows
+                </Link>
+                <Link
+                  to="/templates"
+                  className={`inline-flex items-center px-4 py-2 border-b-2 text-sm font-medium ${location.pathname.startsWith('/templates')
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <LayoutTemplate className="w-4 h-4 mr-2" />
+                  Templates
+                </Link>
+                <Link
+                  to="/credentials"
+                  className={`inline-flex items-center px-4 py-2 border-b-2 text-sm font-medium ${location.pathname.startsWith('/credentials')
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Credentials
                 </Link>
               </div>
             </div>

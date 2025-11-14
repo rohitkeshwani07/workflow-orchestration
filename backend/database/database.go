@@ -79,6 +79,8 @@ func (db *DB) autoMigrate() error {
 		&models.NodeExecutionLog{},
 		&models.ChatSession{},
 		&models.ChatMessage{},
+		&models.Credential{},
+		&models.WorkflowTemplate{},
 	)
 }
 
@@ -189,6 +191,70 @@ func (db *DB) GetChatMessages(sessionID string) ([]models.ChatMessage, error) {
 		Order("timestamp ASC").
 		Find(&messages).Error
 	return messages, err
+}
+
+// Credential operations
+func (db *DB) CreateCredential(c *models.Credential) error {
+	return db.conn.Create(c).Error
+}
+
+func (db *DB) GetCredential(id string) (*models.Credential, error) {
+	var credential models.Credential
+	err := db.conn.First(&credential, "id = ?", id).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &credential, err
+}
+
+func (db *DB) GetAllCredentials() ([]models.Credential, error) {
+	var credentials []models.Credential
+	err := db.conn.Order("created_at DESC").Find(&credentials).Error
+	return credentials, err
+}
+
+func (db *DB) UpdateCredential(c *models.Credential) error {
+	return db.conn.Save(c).Error
+}
+
+func (db *DB) DeleteCredential(id string) error {
+	return db.conn.Delete(&models.Credential{}, "id = ?", id).Error
+}
+
+// WorkflowTemplate operations
+func (db *DB) CreateWorkflowTemplate(wt *models.WorkflowTemplate) error {
+	return db.conn.Create(wt).Error
+}
+
+func (db *DB) GetWorkflowTemplate(id string) (*models.WorkflowTemplate, error) {
+	var template models.WorkflowTemplate
+	err := db.conn.First(&template, "id = ?", id).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &template, err
+}
+
+func (db *DB) GetAllWorkflowTemplates() ([]models.WorkflowTemplate, error) {
+	var templates []models.WorkflowTemplate
+	err := db.conn.Order("featured DESC, created_at DESC").Find(&templates).Error
+	return templates, err
+}
+
+func (db *DB) GetWorkflowTemplatesByCategory(category string) ([]models.WorkflowTemplate, error) {
+	var templates []models.WorkflowTemplate
+	err := db.conn.Where("category = ?", category).
+		Order("featured DESC, created_at DESC").
+		Find(&templates).Error
+	return templates, err
+}
+
+func (db *DB) UpdateWorkflowTemplate(wt *models.WorkflowTemplate) error {
+	return db.conn.Save(wt).Error
+}
+
+func (db *DB) DeleteWorkflowTemplate(id string) error {
+	return db.conn.Delete(&models.WorkflowTemplate{}, "id = ?", id).Error
 }
 
 // NewFromEnv creates a database connection from environment variables
