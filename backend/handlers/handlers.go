@@ -9,6 +9,7 @@ import (
 	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/engine"
 	"github.com/workflow-orchestration/backend/models"
+	"github.com/workflow-orchestration/backend/utils"
 )
 
 type Handler struct {
@@ -279,6 +280,491 @@ func (h *Handler) GetExecutionDetails(c *gin.Context) {
 			"execution": execution,
 			"logs":      logs,
 		},
+	})
+}
+
+// GetAllCredentials handles GET /api/credentials
+func (h *Handler) GetAllCredentials(c *gin.Context) {
+	credentials, err := h.db.GetAllCredentials()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Never return decrypted values in list view
+	for i := range credentials {
+		credentials[i].DecryptedValue = ""
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    credentials,
+	})
+}
+
+// GetCredential handles GET /api/credentials/:id
+func (h *Handler) GetCredential(c *gin.Context) {
+	id := c.Param("id")
+
+	credential, err := h.db.GetCredential(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	if credential == nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Credential not found"),
+		})
+		return
+	}
+
+	// Decrypt value for retrieval
+	decryptedValue, err := utils.Decrypt(credential.EncryptedValue)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Failed to decrypt credential"),
+		})
+		return
+	}
+	credential.DecryptedValue = decryptedValue
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    credential,
+	})
+}
+
+// CreateCredential handles POST /api/credentials
+func (h *Handler) CreateCredential(c *gin.Context) {
+	var req struct {
+		Name        string                 `json:"name"`
+		Type        models.CredentialType  `json:"type"`
+		Description *string                `json:"description"`
+		Value       string                 `json:"value"`
+		Metadata    map[string]interface{} `json:"metadata"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Encrypt the value
+	encryptedValue, err := utils.Encrypt(req.Value)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Failed to encrypt credential"),
+		})
+		return
+	}
+
+	now := time.Now()
+	credential := &models.Credential{
+		ID:             uuid.New().String(),
+		Name:           req.Name,
+		Type:           req.Type,
+		Description:    req.Description,
+		EncryptedValue: encryptedValue,
+		Metadata:       req.Metadata,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	if err := h.db.CreateCredential(credential); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Don't return encrypted value
+	credential.DecryptedValue = ""
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    credential,
+	})
+}
+
+// UpdateCredential handles PUT /api/credentials/:id
+func (h *Handler) UpdateCredential(c *gin.Context) {
+	id := c.Param("id")
+
+	existing, err := h.db.GetCredential(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	if existing == nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Credential not found"),
+		})
+		return
+	}
+
+	var req struct {
+		Name        *string                `json:"name"`
+		Type        *models.CredentialType `json:"type"`
+		Description *string                `json:"description"`
+		Value       *string                `json:"value"`
+		Metadata    map[string]interface{} `json:"metadata"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Update fields
+	if req.Name != nil {
+		existing.Name = *req.Name
+	}
+	if req.Type != nil {
+		existing.Type = *req.Type
+	}
+	if req.Description != nil {
+		existing.Description = req.Description
+	}
+	if req.Value != nil {
+		// Re-encrypt the new value
+		encryptedValue, err := utils.Encrypt(*req.Value)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.APIResponse{
+				Success: false,
+				Error:   stringPtr("Failed to encrypt credential"),
+			})
+			return
+		}
+		existing.EncryptedValue = encryptedValue
+	}
+	if req.Metadata != nil {
+		existing.Metadata = req.Metadata
+	}
+	existing.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateCredential(existing); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Don't return encrypted value
+	existing.DecryptedValue = ""
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    existing,
+	})
+}
+
+// DeleteCredential handles DELETE /api/credentials/:id
+func (h *Handler) DeleteCredential(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.db.DeleteCredential(id); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+	})
+}
+
+// GetAllWorkflowTemplates handles GET /api/templates
+func (h *Handler) GetAllWorkflowTemplates(c *gin.Context) {
+	category := c.Query("category")
+
+	var templates []models.WorkflowTemplate
+	var err error
+
+	if category != "" {
+		templates, err = h.db.GetWorkflowTemplatesByCategory(category)
+	} else {
+		templates, err = h.db.GetAllWorkflowTemplates()
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    templates,
+	})
+}
+
+// GetWorkflowTemplate handles GET /api/templates/:id
+func (h *Handler) GetWorkflowTemplate(c *gin.Context) {
+	id := c.Param("id")
+
+	template, err := h.db.GetWorkflowTemplate(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	if template == nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Template not found"),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    template,
+	})
+}
+
+// CreateWorkflowFromTemplate handles POST /api/templates/:id/create-workflow
+func (h *Handler) CreateWorkflowFromTemplate(c *gin.Context) {
+	templateID := c.Param("id")
+
+	template, err := h.db.GetWorkflowTemplate(templateID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	if template == nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Template not found"),
+		})
+		return
+	}
+
+	var req struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Default to template name if not provided
+		req.Name = &template.Name
+	}
+
+	// Create workflow from template
+	now := time.Now()
+	workflowName := template.Name
+	if req.Name != nil {
+		workflowName = *req.Name
+	}
+
+	workflowDesc := template.Description
+	if req.Description != nil {
+		workflowDesc = req.Description
+	}
+
+	workflow := &models.Workflow{
+		ID:          uuid.New().String(),
+		Name:        workflowName,
+		Description: workflowDesc,
+		Nodes:       template.Nodes,
+		Edges:       template.Edges,
+		Active:      false,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := h.db.CreateWorkflow(workflow); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    workflow,
+	})
+}
+
+// CreateWorkflowTemplate handles POST /api/templates
+func (h *Handler) CreateWorkflowTemplate(c *gin.Context) {
+	var req struct {
+		Name        string        `json:"name"`
+		Description *string       `json:"description"`
+		Category    string        `json:"category"`
+		Tags        []string      `json:"tags"`
+		Nodes       []models.Node `json:"nodes"`
+		Edges       []models.Edge `json:"edges"`
+		Thumbnail   *string       `json:"thumbnail"`
+		Featured    bool          `json:"featured"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	now := time.Now()
+	template := &models.WorkflowTemplate{
+		ID:          uuid.New().String(),
+		Name:        req.Name,
+		Description: req.Description,
+		Category:    req.Category,
+		Tags:        req.Tags,
+		Nodes:       req.Nodes,
+		Edges:       req.Edges,
+		Thumbnail:   req.Thumbnail,
+		Featured:    req.Featured,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := h.db.CreateWorkflowTemplate(template); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    template,
+	})
+}
+
+// UpdateWorkflowTemplate handles PUT /api/templates/:id
+func (h *Handler) UpdateWorkflowTemplate(c *gin.Context) {
+	id := c.Param("id")
+
+	existing, err := h.db.GetWorkflowTemplate(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	if existing == nil {
+		c.JSON(http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("Template not found"),
+		})
+		return
+	}
+
+	var req struct {
+		Name        *string       `json:"name"`
+		Description *string       `json:"description"`
+		Category    *string       `json:"category"`
+		Tags        []string      `json:"tags"`
+		Nodes       []models.Node `json:"nodes"`
+		Edges       []models.Edge `json:"edges"`
+		Thumbnail   *string       `json:"thumbnail"`
+		Featured    *bool         `json:"featured"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	// Update fields
+	if req.Name != nil {
+		existing.Name = *req.Name
+	}
+	if req.Description != nil {
+		existing.Description = req.Description
+	}
+	if req.Category != nil {
+		existing.Category = *req.Category
+	}
+	if req.Tags != nil {
+		existing.Tags = req.Tags
+	}
+	if req.Nodes != nil {
+		existing.Nodes = req.Nodes
+	}
+	if req.Edges != nil {
+		existing.Edges = req.Edges
+	}
+	if req.Thumbnail != nil {
+		existing.Thumbnail = req.Thumbnail
+	}
+	if req.Featured != nil {
+		existing.Featured = *req.Featured
+	}
+	existing.UpdatedAt = time.Now()
+
+	if err := h.db.UpdateWorkflowTemplate(existing); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    existing,
+	})
+}
+
+// DeleteWorkflowTemplate handles DELETE /api/templates/:id
+func (h *Handler) DeleteWorkflowTemplate(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.db.DeleteWorkflowTemplate(id); err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
 	})
 }
 

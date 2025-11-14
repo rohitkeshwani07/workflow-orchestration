@@ -10,17 +10,44 @@ import (
 	"strings"
 	"time"
 
+	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/models"
+	"github.com/workflow-orchestration/backend/utils"
 )
 
 type NodeExecutor struct {
+	db              *database.DB
 	anthropicAPIKey string
 }
 
-func NewNodeExecutor(anthropicAPIKey string) *NodeExecutor {
+func NewNodeExecutor(db *database.DB, anthropicAPIKey string) *NodeExecutor {
 	return &NodeExecutor{
+		db:              db,
 		anthropicAPIKey: anthropicAPIKey,
 	}
+}
+
+// getCredentialValue retrieves and decrypts a credential value by ID
+func (ne *NodeExecutor) getCredentialValue(credentialID string) (string, error) {
+	if credentialID == "" {
+		return "", nil
+	}
+
+	credential, err := ne.db.GetCredential(credentialID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get credential: %w", err)
+	}
+	if credential == nil {
+		return "", fmt.Errorf("credential not found: %s", credentialID)
+	}
+
+	// Decrypt the value
+	decryptedValue, err := utils.Decrypt(credential.EncryptedValue)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt credential: %w", err)
+	}
+
+	return decryptedValue, nil
 }
 
 func (ne *NodeExecutor) Execute(node *models.Node, ctx map[string]interface{}) (interface{}, error) {

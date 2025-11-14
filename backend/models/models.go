@@ -291,3 +291,142 @@ type TransformConfig struct {
 type ConditionConfig struct {
 	Expression string `json:"expression"`
 }
+
+// Credential types
+type CredentialType string
+
+const (
+	CredentialTypeAPIKey     CredentialType = "api_key"
+	CredentialTypeOAuth      CredentialType = "oauth"
+	CredentialTypeBasicAuth  CredentialType = "basic_auth"
+	CredentialTypeBearerToken CredentialType = "bearer_token"
+	CredentialTypeCustom     CredentialType = "custom"
+)
+
+// Credential stores encrypted user credentials
+type Credential struct {
+	ID          string         `json:"id" gorm:"primaryKey"`
+	Name        string         `json:"name" gorm:"not null"`
+	Type        CredentialType `json:"type" gorm:"not null"`
+	Description *string        `json:"description,omitempty"`
+	// Value is encrypted at rest
+	EncryptedValue string                 `json:"-" gorm:"column:encrypted_value;not null"`
+	// DecryptedValue is used temporarily and never stored
+	DecryptedValue string                 `json:"value,omitempty" gorm:"-"`
+	// Metadata stores additional non-sensitive information
+	Metadata     map[string]interface{} `json:"metadata,omitempty" gorm:"-"`
+	MetadataJSON JSON                   `json:"-" gorm:"column:metadata"`
+	CreatedAt    time.Time              `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt    time.Time              `json:"updatedAt" gorm:"autoUpdateTime"`
+}
+
+// TableName overrides the table name
+func (Credential) TableName() string {
+	return "credentials"
+}
+
+// BeforeSave hook
+func (c *Credential) BeforeSave(tx *gorm.DB) error {
+	// Always set MetadataJSON to avoid NULL constraint violations
+	if c.Metadata == nil {
+		c.MetadataJSON = JSON("{}")
+	} else {
+		metadata, err := json.Marshal(c.Metadata)
+		if err != nil {
+			return err
+		}
+		c.MetadataJSON = JSON(metadata)
+	}
+	return nil
+}
+
+// AfterFind hook
+func (c *Credential) AfterFind(tx *gorm.DB) error {
+	if len(c.MetadataJSON) > 0 && string(c.MetadataJSON) != "null" {
+		if err := json.Unmarshal(c.MetadataJSON, &c.Metadata); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// WorkflowTemplate represents a pre-built workflow template
+type WorkflowTemplate struct {
+	ID          string    `json:"id" gorm:"primaryKey"`
+	Name        string    `json:"name" gorm:"not null"`
+	Description *string   `json:"description,omitempty"`
+	Category    string    `json:"category" gorm:"not null"` // e.g., "Customer Support", "Data Processing", "Integration"
+	Tags        []string  `json:"tags,omitempty" gorm:"-"`
+	TagsJSON    JSON      `json:"-" gorm:"column:tags"`
+	Nodes       []Node    `json:"nodes" gorm:"-"`
+	NodesJSON   JSON      `json:"-" gorm:"column:nodes"`
+	Edges       []Edge    `json:"edges" gorm:"-"`
+	EdgesJSON   JSON      `json:"-" gorm:"column:edges"`
+	Thumbnail   *string   `json:"thumbnail,omitempty"` // URL or base64 encoded image
+	Featured    bool      `json:"featured" gorm:"default:false"`
+	CreatedAt   time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+}
+
+// TableName overrides the table name
+func (WorkflowTemplate) TableName() string {
+	return "workflow_templates"
+}
+
+// BeforeSave hook
+func (wt *WorkflowTemplate) BeforeSave(tx *gorm.DB) error {
+	// Always set NodesJSON to avoid NULL constraint violations
+	if wt.Nodes == nil {
+		wt.NodesJSON = JSON("[]")
+	} else {
+		nodes, err := json.Marshal(wt.Nodes)
+		if err != nil {
+			return err
+		}
+		wt.NodesJSON = JSON(nodes)
+	}
+
+	// Always set EdgesJSON to avoid NULL constraint violations
+	if wt.Edges == nil {
+		wt.EdgesJSON = JSON("[]")
+	} else {
+		edges, err := json.Marshal(wt.Edges)
+		if err != nil {
+			return err
+		}
+		wt.EdgesJSON = JSON(edges)
+	}
+
+	// Always set TagsJSON to avoid NULL constraint violations
+	if wt.Tags == nil {
+		wt.TagsJSON = JSON("[]")
+	} else {
+		tags, err := json.Marshal(wt.Tags)
+		if err != nil {
+			return err
+		}
+		wt.TagsJSON = JSON(tags)
+	}
+
+	return nil
+}
+
+// AfterFind hook
+func (wt *WorkflowTemplate) AfterFind(tx *gorm.DB) error {
+	if len(wt.NodesJSON) > 0 && string(wt.NodesJSON) != "null" {
+		if err := json.Unmarshal(wt.NodesJSON, &wt.Nodes); err != nil {
+			return err
+		}
+	}
+	if len(wt.EdgesJSON) > 0 && string(wt.EdgesJSON) != "null" {
+		if err := json.Unmarshal(wt.EdgesJSON, &wt.Edges); err != nil {
+			return err
+		}
+	}
+	if len(wt.TagsJSON) > 0 && string(wt.TagsJSON) != "null" {
+		if err := json.Unmarshal(wt.TagsJSON, &wt.Tags); err != nil {
+			return err
+		}
+	}
+	return nil
+}

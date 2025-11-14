@@ -1,7 +1,7 @@
 import { Node as FlowNode } from 'reactflow';
 import { NodeType } from '@workflow/shared';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface NodeConfigPanelProps {
   node: FlowNode;
@@ -15,12 +15,37 @@ interface MCPTool {
   server?: string;
 }
 
+interface Credential {
+  id: string;
+  name: string;
+  type: string;
+  description?: string;
+}
+
 export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigPanelProps) {
   const [newToolName, setNewToolName] = useState('');
   const [newToolDesc, setNewToolDesc] = useState('');
   const [newToolServer, setNewToolServer] = useState('');
+  const [credentials, setCredentials] = useState<Credential[]>([]);
 
   const tools: MCPTool[] = node.data.tools || [];
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+  useEffect(() => {
+    fetchCredentials();
+  }, []);
+
+  const fetchCredentials = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/credentials`);
+      const result = await response.json();
+      if (result.success) {
+        setCredentials(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch credentials:', error);
+    }
+  };
 
   const addTool = () => {
     if (!newToolName || !newToolDesc) return;
@@ -54,6 +79,30 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
 
         return (
           <div className="space-y-4">
+            {/* API Key Credential */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                API Key Credential
+              </label>
+              <select
+                value={node.data.credentialId || ''}
+                onChange={(e) => onUpdate(node.id, { credentialId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Use environment variable (default)</option>
+                {credentials
+                  .filter((c) => c.type === 'api_key')
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.description && `(${c.description})`}
+                    </option>
+                  ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Select a credential or leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY from environment
+              </p>
+            </div>
+
             {/* Provider Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -299,6 +348,28 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
       case NodeType.HTTP_REQUEST:
         return (
           <div className="space-y-4">
+            {/* Authentication Credential */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Authentication
+              </label>
+              <select
+                value={node.data.credentialId || ''}
+                onChange={(e) => onUpdate(node.id, { credentialId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">No authentication</option>
+                {credentials.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.type}) {c.description && `- ${c.description}`}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Selected credential will be automatically added to request headers
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Method</label>
               <select

@@ -18,7 +18,7 @@ type WorkflowEngine struct {
 func NewWorkflowEngine(db *database.DB, anthropicAPIKey string) *WorkflowEngine {
 	return &WorkflowEngine{
 		db:       db,
-		executor: NewNodeExecutor(anthropicAPIKey),
+		executor: NewNodeExecutor(db, anthropicAPIKey),
 	}
 }
 
