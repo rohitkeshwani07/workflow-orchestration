@@ -55,7 +55,7 @@ services:
       - DB_SSLMODE=${DB_SSLMODE:-disable}
       - AUTO_MIGRATE=${AUTO_MIGRATE:-false}
       - CREDENTIALS_SERVICE_URL=http://credentials:3002
-      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_HOST=clickhouse:9000
       - CLICKHOUSE_DB=logs
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
@@ -204,7 +204,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - USE_REDIS=true
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:3001"]
     depends_on:
       redis:
         condition: service_healthy

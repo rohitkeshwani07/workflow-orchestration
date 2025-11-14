@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS logs.execution_logs (
 ) ENGINE = MergeTree()
 ORDER BY (timestamp, execution_id)
 PARTITION BY toYYYYMM(timestamp)
-TTL timestamp + INTERVAL 90 DAY  -- Keep logs for 90 days
+TTL toDateTime(timestamp) + INTERVAL 90 DAY  -- Keep logs for 90 days
 SETTINGS index_granularity = 8192;
 
 -- Node Execution Table
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS logs.node_executions (
 ) ENGINE = MergeTree()
 ORDER BY (started_at, execution_id, node_id)
 PARTITION BY toYYYYMM(started_at)
-TTL started_at + INTERVAL 90 DAY
+TTL toDateTime(started_at) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- Workflow Execution Summary Table
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS logs.workflow_executions (
 ) ENGINE = MergeTree()
 ORDER BY (started_at, execution_id)
 PARTITION BY toYYYYMM(started_at)
-TTL started_at + INTERVAL 90 DAY
+TTL toDateTime(started_at) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- Materialized view for recent execution statistics

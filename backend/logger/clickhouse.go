@@ -20,9 +20,10 @@ type ClickHouseLogger struct {
 
 // NewClickHouseLogger creates a new ClickHouse logger instance
 func NewClickHouseLogger() (*ClickHouseLogger, error) {
-	clickhouseURL := os.Getenv("CLICKHOUSE_URL")
-	if clickhouseURL == "" {
-		clickhouseURL = "http://localhost:8123"
+	// Use native protocol (port 9000) for clickhouse-go v2
+	clickhouseHost := os.Getenv("CLICKHOUSE_HOST")
+	if clickhouseHost == "" {
+		clickhouseHost = "clickhouse:9000"
 	}
 
 	clickhouseDB := os.Getenv("CLICKHOUSE_DB")
@@ -38,7 +39,7 @@ func NewClickHouseLogger() (*ClickHouseLogger, error) {
 	password := os.Getenv("CLICKHOUSE_PASSWORD")
 
 	conn, err := clickhouse.Open(&clickhouse.Options{
-		Addr: []string{clickhouseURL[7:]}, // Remove http:// prefix
+		Addr: []string{clickhouseHost},
 		Auth: clickhouse.Auth{
 			Database: clickhouseDB,
 			Username: username,
@@ -61,7 +62,7 @@ func NewClickHouseLogger() (*ClickHouseLogger, error) {
 		return nil, fmt.Errorf("failed to ping ClickHouse: %w", err)
 	}
 
-	log.Printf("Connected to ClickHouse at %s", clickhouseURL)
+	log.Printf("Connected to ClickHouse at %s (database: %s)", clickhouseHost, clickhouseDB)
 
 	return &ClickHouseLogger{
 		conn: conn,
@@ -79,16 +80,16 @@ func (l *ClickHouseLogger) Close() error {
 
 // ExecutionLog represents a log entry
 type ExecutionLog struct {
-	ExecutionID string
-	WorkflowID  string
-	NodeID      string
-	Timestamp   time.Time
-	Level       string
-	Message     string
-	Metadata    map[string]interface{}
-	Status      string
-	Error       string
-	DurationMs  uint32
+	ExecutionID string                 `json:"execution_id"`
+	WorkflowID  string                 `json:"workflow_id"`
+	NodeID      string                 `json:"node_id"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Level       string                 `json:"level"`
+	Message     string                 `json:"message"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Status      string                 `json:"status"`
+	Error       string                 `json:"error,omitempty"`
+	DurationMs  uint32                 `json:"duration_ms"`
 }
 
 // LogExecution writes an execution log entry to ClickHouse
@@ -131,19 +132,19 @@ func (l *ClickHouseLogger) LogExecution(ctx context.Context, log ExecutionLog) e
 
 // NodeExecution represents a node execution record
 type NodeExecution struct {
-	ExecutionID  string
-	WorkflowID   string
-	NodeID       string
-	StartedAt    time.Time
-	CompletedAt  time.Time
-	Status       string
-	NodeType     string
-	Input        map[string]interface{}
-	Output       map[string]interface{}
-	Error        string
-	DurationMs   uint32
-	RetryCount   uint8
-	Metadata     map[string]interface{}
+	ExecutionID  string                 `json:"execution_id"`
+	WorkflowID   string                 `json:"workflow_id"`
+	NodeID       string                 `json:"node_id"`
+	StartedAt    time.Time              `json:"started_at"`
+	CompletedAt  time.Time              `json:"completed_at,omitempty"`
+	Status       string                 `json:"status"`
+	NodeType     string                 `json:"node_type"`
+	Input        map[string]interface{} `json:"input,omitempty"`
+	Output       map[string]interface{} `json:"output,omitempty"`
+	Error        string                 `json:"error,omitempty"`
+	DurationMs   uint32                 `json:"duration_ms"`
+	RetryCount   uint8                  `json:"retry_count"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // LogNodeExecution writes a node execution record to ClickHouse
@@ -188,20 +189,20 @@ func (l *ClickHouseLogger) LogNodeExecution(ctx context.Context, exec NodeExecut
 
 // WorkflowExecution represents a workflow execution summary
 type WorkflowExecution struct {
-	ExecutionID      string
-	WorkflowID       string
-	StartedAt        time.Time
-	CompletedAt      time.Time
-	Status           string
-	TriggerType      string
-	TriggeredBy      string
-	TotalNodes       uint16
-	SuccessfulNodes  uint16
-	FailedNodes      uint16
-	SkippedNodes     uint16
-	DurationMs       uint32
-	Error            string
-	Metadata         map[string]interface{}
+	ExecutionID      string                 `json:"execution_id"`
+	WorkflowID       string                 `json:"workflow_id"`
+	StartedAt        time.Time              `json:"started_at"`
+	CompletedAt      time.Time              `json:"completed_at,omitempty"`
+	Status           string                 `json:"status"`
+	TriggerType      string                 `json:"trigger_type"`
+	TriggeredBy      string                 `json:"triggered_by"`
+	TotalNodes       uint16                 `json:"total_nodes"`
+	SuccessfulNodes  uint16                 `json:"successful_nodes"`
+	FailedNodes      uint16                 `json:"failed_nodes"`
+	SkippedNodes     uint16                 `json:"skipped_nodes"`
+	DurationMs       uint32                 `json:"duration_ms"`
+	Error            string                 `json:"error,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // LogWorkflowExecution writes a workflow execution summary to ClickHouse
