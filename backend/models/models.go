@@ -85,7 +85,10 @@ type Node struct {
 
 // BeforeSave hook to convert Data to JSON
 func (n *Node) BeforeSave(tx *gorm.DB) error {
-	if n.Data != nil {
+	// Always set DataJSON to avoid NULL constraint violations
+	if n.Data == nil {
+		n.DataJSON = JSON("{}")
+	} else {
 		data, err := json.Marshal(n.Data)
 		if err != nil {
 			return err
@@ -97,7 +100,7 @@ func (n *Node) BeforeSave(tx *gorm.DB) error {
 
 // AfterFind hook to convert JSON to Data
 func (n *Node) AfterFind(tx *gorm.DB) error {
-	if len(n.DataJSON) > 0 {
+	if len(n.DataJSON) > 0 && string(n.DataJSON) != "null" {
 		return json.Unmarshal(n.DataJSON, &n.Data)
 	}
 	return nil
@@ -131,14 +134,21 @@ func (Workflow) TableName() string {
 
 // BeforeSave hook
 func (w *Workflow) BeforeSave(tx *gorm.DB) error {
-	if w.Nodes != nil {
+	// Always set NodesJSON to avoid NULL constraint violations
+	if w.Nodes == nil {
+		w.NodesJSON = JSON("[]")
+	} else {
 		nodes, err := json.Marshal(w.Nodes)
 		if err != nil {
 			return err
 		}
 		w.NodesJSON = JSON(nodes)
 	}
-	if w.Edges != nil {
+
+	// Always set EdgesJSON to avoid NULL constraint violations
+	if w.Edges == nil {
+		w.EdgesJSON = JSON("[]")
+	} else {
 		edges, err := json.Marshal(w.Edges)
 		if err != nil {
 			return err
@@ -150,12 +160,12 @@ func (w *Workflow) BeforeSave(tx *gorm.DB) error {
 
 // AfterFind hook
 func (w *Workflow) AfterFind(tx *gorm.DB) error {
-	if len(w.NodesJSON) > 0 {
+	if len(w.NodesJSON) > 0 && string(w.NodesJSON) != "null" {
 		if err := json.Unmarshal(w.NodesJSON, &w.Nodes); err != nil {
 			return err
 		}
 	}
-	if len(w.EdgesJSON) > 0 {
+	if len(w.EdgesJSON) > 0 && string(w.EdgesJSON) != "null" {
 		if err := json.Unmarshal(w.EdgesJSON, &w.Edges); err != nil {
 			return err
 		}
@@ -190,7 +200,10 @@ func (Execution) TableName() string {
 
 // BeforeSave hook
 func (e *Execution) BeforeSave(tx *gorm.DB) error {
-	if e.Context != nil {
+	// Always set ContextJSON to avoid NULL constraint violations
+	if e.Context == nil {
+		e.ContextJSON = JSON("{}")
+	} else {
 		ctx, err := json.Marshal(e.Context)
 		if err != nil {
 			return err
@@ -202,7 +215,7 @@ func (e *Execution) BeforeSave(tx *gorm.DB) error {
 
 // AfterFind hook
 func (e *Execution) AfterFind(tx *gorm.DB) error {
-	if len(e.ContextJSON) > 0 {
+	if len(e.ContextJSON) > 0 && string(e.ContextJSON) != "null" {
 		return json.Unmarshal(e.ContextJSON, &e.Context)
 	}
 	return nil
