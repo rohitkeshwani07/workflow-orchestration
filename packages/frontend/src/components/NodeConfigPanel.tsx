@@ -79,80 +79,6 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
 
         return (
           <div className="space-y-4">
-            {/* API Key Credential */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                API Key Credential
-              </label>
-              <select
-                value={node.data.credentialId || ''}
-                onChange={(e) => onUpdate(node.id, { credentialId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Use environment variable (default)</option>
-                {credentials
-                  .filter((c) => c.type === 'api_key')
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.description && `(${c.description})`}
-                    </option>
-                  ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Select a credential or leave empty to use ANTHROPIC_API_KEY / OPENAI_API_KEY from environment
-              </p>
-            </div>
-
-            {/* Provider Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                AI Provider
-              </label>
-              <select
-                value={provider}
-                onChange={(e) => {
-                  const newProvider = e.target.value;
-                  onUpdate(node.id, {
-                    provider: newProvider,
-                    // Reset model to provider's default
-                    model:
-                      newProvider === 'openai'
-                        ? 'gpt-4-turbo-preview'
-                        : 'claude-3-5-sonnet-20241022',
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="anthropic">Anthropic Claude</option>
-                <option value="openai">OpenAI</option>
-              </select>
-            </div>
-
-            {/* Model Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-              <select
-                value={node.data.model || 'claude-3-5-sonnet-20241022'}
-                onChange={(e) => onUpdate(node.id, { model: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              >
-                {provider === 'anthropic' ? (
-                  <>
-                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                  </>
-                )}
-              </select>
-            </div>
-
             {/* System Prompt */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -199,148 +125,239 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
               />
             </div>
 
-            {/* Memory Configuration */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Memory Configuration</h4>
+            {/* Attachments Section */}
+            <div className="pt-4 border-t-2 border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Attachments</h3>
 
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="memoryEnabled"
-                    checked={node.data.memoryEnabled !== false}
-                    onChange={(e) => onUpdate(node.id, { memoryEnabled: e.target.checked })}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                  />
-                  <label
-                    htmlFor="memoryEnabled"
-                    className="ml-2 block text-sm text-gray-700"
-                  >
-                    Enable conversation memory
-                  </label>
+              {/* AI Model Attachment */}
+              <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
+                <h4 className="text-sm font-semibold text-purple-900 mb-3 flex items-center">
+                  <span className="w-2 h-2 bg-purple-600 rounded-full mr-2"></span>
+                  AI Model
+                </h4>
+
+                <div className="space-y-3">
+                  {/* API Key Credential */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      API Key Credential
+                    </label>
+                    <select
+                      value={node.data.credentialId || ''}
+                      onChange={(e) => onUpdate(node.id, { credentialId: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="">Use environment variable</option>
+                      {credentials
+                        .filter((c) => c.type === 'api_key')
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.description && `(${c.description})`}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Provider Selection */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Provider
+                    </label>
+                    <select
+                      value={provider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        onUpdate(node.id, {
+                          provider: newProvider,
+                          model:
+                            newProvider === 'openai'
+                              ? 'gpt-4-turbo-preview'
+                              : 'claude-3-5-sonnet-20241022',
+                        });
+                      }}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="anthropic">Anthropic Claude</option>
+                      <option value="openai">OpenAI</option>
+                    </select>
+                  </div>
+
+                  {/* Model Selection */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Model</label>
+                    <select
+                      value={node.data.model || 'claude-3-5-sonnet-20241022'}
+                      onChange={(e) => onUpdate(node.id, { model: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      {provider === 'anthropic' ? (
+                        <>
+                          <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                          <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                          <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                          <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+                          <option value="gpt-4">GPT-4</option>
+                          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
                 </div>
+              </div>
 
-                {node.data.memoryEnabled !== false && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Memory Type
-                      </label>
-                      <select
-                        value={memoryType}
-                        onChange={(e) => onUpdate(node.id, { memoryType: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="last_messages">Last N Messages</option>
-                        <option value="summary" disabled>
-                          Summary (Coming Soon)
-                        </option>
-                        <option value="full" disabled>
-                          Full History (Coming Soon)
-                        </option>
-                      </select>
-                    </div>
+              {/* Memory Attachment */}
+              <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border-2 border-green-200">
+                <h4 className="text-sm font-semibold text-green-900 mb-3 flex items-center">
+                  <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+                  Memory
+                </h4>
 
-                    {memoryType === 'last_messages' && (
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="memoryEnabled"
+                      checked={node.data.memoryEnabled !== false}
+                      onChange={(e) => onUpdate(node.id, { memoryEnabled: e.target.checked })}
+                      className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                    <label
+                      htmlFor="memoryEnabled"
+                      className="ml-2 block text-xs font-medium text-gray-700"
+                    >
+                      Enable conversation memory
+                    </label>
+                  </div>
+
+                  {node.data.memoryEnabled !== false && (
+                    <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Number of Messages
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Memory Type
                         </label>
                         <select
-                          value={maxMemoryMessages}
-                          onChange={(e) =>
-                            onUpdate(node.id, {
-                              maxMemoryMessages: parseInt(e.target.value),
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          value={memoryType}
+                          onChange={(e) => onUpdate(node.id, { memoryType: e.target.value })}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
                         >
-                          <option value="5">Last 5 messages</option>
-                          <option value="10">Last 10 messages</option>
-                          <option value="20">Last 20 messages</option>
-                          <option value="50">Last 50 messages</option>
-                          <option value="100">Last 100 messages</option>
+                          <option value="last_messages">Last N Messages</option>
+                          <option value="summary" disabled>
+                            Summary (Coming Soon)
+                          </option>
+                          <option value="full" disabled>
+                            Full History (Coming Soon)
+                          </option>
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Agent will remember the last {maxMemoryMessages} messages in the
-                          conversation
-                        </p>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
 
-            {/* MCP Tools */}
-            <div className="border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">MCP Tools</h4>
-
-              {/* List existing tools */}
-              {tools.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {tools.map((tool, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start justify-between p-2 bg-gray-50 rounded border"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{tool.name}</div>
-                        <div className="text-xs text-gray-600">{tool.description}</div>
-                        {tool.server && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            Server: {tool.server}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeTool(index)}
-                        className="ml-2 text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                      {memoryType === 'last_messages' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Number of Messages
+                          </label>
+                          <select
+                            value={maxMemoryMessages}
+                            onChange={(e) =>
+                              onUpdate(node.id, {
+                                maxMemoryMessages: parseInt(e.target.value),
+                              })
+                            }
+                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                          >
+                            <option value="5">Last 5 messages</option>
+                            <option value="10">Last 10 messages</option>
+                            <option value="20">Last 20 messages</option>
+                            <option value="50">Last 50 messages</option>
+                            <option value="100">Last 100 messages</option>
+                          </select>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Remembers last {maxMemoryMessages} messages
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              )}
-
-              {/* Add new tool */}
-              <div className="space-y-2 p-3 bg-gray-50 rounded">
-                <input
-                  type="text"
-                  placeholder="Tool name (e.g., read_file)"
-                  value={newToolName}
-                  onChange={(e) => setNewToolName(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Description"
-                  value={newToolDesc}
-                  onChange={(e) => setNewToolDesc(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="MCP server name (optional)"
-                  value={newToolServer}
-                  onChange={(e) => setNewToolServer(e.target.value)}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-                />
-                <button
-                  onClick={addTool}
-                  disabled={!newToolName || !newToolDesc}
-                  className="w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Tool
-                </button>
               </div>
 
-              <p className="mt-2 text-xs text-gray-500">
-                MCP tools must be configured in the AI Agent Service. Common tools: read_file,
-                write_file, git_status, web_search, query_database.
-              </p>
+              {/* Tools Attachment */}
+              <div className="p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg border-2 border-orange-200">
+                <h4 className="text-sm font-semibold text-orange-900 mb-3 flex items-center">
+                  <span className="w-2 h-2 bg-orange-600 rounded-full mr-2"></span>
+                  Tools
+                </h4>
+
+                <div className="space-y-3">
+                  {/* List existing tools */}
+                  {tools.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {tools.map((tool, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start justify-between p-2 bg-white rounded border"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium text-xs">{tool.name}</div>
+                            <div className="text-xs text-gray-600">{tool.description}</div>
+                            {tool.server && (
+                              <div className="text-xs text-orange-600 mt-1">
+                                Server: {tool.server}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => removeTool(index)}
+                            className="ml-2 text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add new tool */}
+                  <div className="space-y-2 p-2 bg-white rounded border">
+                    <input
+                      type="text"
+                      placeholder="Tool name (e.g., read_file)"
+                      value={newToolName}
+                      onChange={(e) => setNewToolName(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      value={newToolDesc}
+                      onChange={(e) => setNewToolDesc(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="MCP server name (optional)"
+                      value={newToolServer}
+                      onChange={(e) => setNewToolServer(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-orange-500 focus:border-orange-500"
+                    />
+                    <button
+                      onClick={addTool}
+                      disabled={!newToolName || !newToolDesc}
+                      className="w-full px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add Tool
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    MCP tools must be configured in the AI Agent Service. Common tools: read_file, write_file, git_status, web_search, query_database.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         );
