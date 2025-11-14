@@ -55,10 +55,16 @@ services:
       - DB_SSLMODE=${DB_SSLMODE:-disable}
       - AUTO_MIGRATE=${AUTO_MIGRATE:-false}
       - CREDENTIALS_SERVICE_URL=http://credentials:3002
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=logs
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
       credentials:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -126,6 +132,27 @@ services:
       timeout: 5s
       retries: 5
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: workflow-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_DB=logs
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   ai-agent:
     build:
       context: ./ai-agent-service
@@ -188,4 +215,6 @@ volumes:
   postgres-data:
     driver: local
   redis-data:
+    driver: local
+  clickhouse-data:
     driver: local

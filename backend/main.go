@@ -113,6 +113,14 @@ func main() {
 			templates.DELETE("/:id", handler.DeleteWorkflowTemplate)
 			templates.POST("/:id/create-workflow", handler.CreateWorkflowFromTemplate)
 		}
+
+		// Log query endpoints (ClickHouse)
+		logs := api.Group("/logs")
+		{
+			logs.GET("/executions", handler.GetExecutionLogs)
+			logs.GET("/nodes/:execution_id", handler.GetNodeExecutions)
+			logs.GET("/workflows/:workflow_id", handler.GetWorkflowExecutionLogs)
+		}
 	}
 
 	// WebSocket route

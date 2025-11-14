@@ -1,27 +1,40 @@
 package handlers
 
 import (
+	"context"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/engine"
+	"github.com/workflow-orchestration/backend/logger"
 	"github.com/workflow-orchestration/backend/models"
 )
 
 type Handler struct {
 	db     *database.DB
 	engine *engine.WorkflowEngine
+	logger *logger.ClickHouseLogger
 }
 
 func NewHandler(db *database.DB, engine *engine.WorkflowEngine) *Handler {
+	// Initialize ClickHouse logger
+	chLogger, err := logger.NewClickHouseLogger()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize ClickHouse logger: %v", err)
+		chLogger = nil
+	}
+
 	return &Handler{
 		db:     db,
 		engine: engine,
+		logger: chLogger,
 	}
 }
 
@@ -604,6 +617,138 @@ func (h *Handler) DeleteWorkflowTemplate(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.APIResponse{
 		Success: true,
+	})
+}
+
+// GetExecutionLogs handles GET /api/logs/executions
+func (h *Handler) GetExecutionLogs(c *gin.Context) {
+	if h.logger == nil {
+		c.JSON(http.StatusServiceUnavailable, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("ClickHouse logger not available"),
+		})
+		return
+	}
+
+	// Parse query parameters
+	filters := make(map[string]interface{})
+
+	if executionID := c.Query("execution_id"); executionID != "" {
+		filters["execution_id"] = executionID
+	}
+
+	if workflowID := c.Query("workflow_id"); workflowID != "" {
+		filters["workflow_id"] = workflowID
+	}
+
+	if level := c.Query("level"); level != "" {
+		filters["level"] = level
+	}
+
+	limit := 100
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	ctx := context.Background()
+	logs, err := h.logger.QueryExecutionLogs(ctx, filters, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    logs,
+	})
+}
+
+// GetNodeExecutions handles GET /api/logs/nodes/:execution_id
+func (h *Handler) GetNodeExecutions(c *gin.Context) {
+	if h.logger == nil {
+		c.JSON(http.StatusServiceUnavailable, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("ClickHouse logger not available"),
+		})
+		return
+	}
+
+	executionID := c.Param("execution_id")
+	if executionID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("execution_id is required"),
+		})
+		return
+	}
+
+	limit := 100
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	ctx := context.Background()
+	executions, err := h.logger.QueryNodeExecutions(ctx, executionID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    executions,
+	})
+}
+
+// GetWorkflowExecutionLogs handles GET /api/logs/workflows/:workflow_id
+func (h *Handler) GetWorkflowExecutionLogs(c *gin.Context) {
+	if h.logger == nil {
+		c.JSON(http.StatusServiceUnavailable, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("ClickHouse logger not available"),
+		})
+		return
+	}
+
+	workflowID := c.Param("workflow_id")
+	if workflowID == "" {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   stringPtr("workflow_id is required"),
+		})
+		return
+	}
+
+	limit := 100
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	ctx := context.Background()
+	executions, err := h.logger.QueryWorkflowExecutions(ctx, workflowID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{
+			Success: false,
+			Error:   stringPtr(err.Error()),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    executions,
 	})
 }
 
