@@ -1,0 +1,22 @@
+{
+  "name": "workflow-orchestration",
+  "version": "1.0.0",
+  "description": "AI-powered workflow orchestration platform",
+  "private": true,
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
+    "build": "npm run build -w packages/shared && npm run build -w packages/backend && npm run build -w packages/frontend",
+    "start": "npm run start -w packages/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
