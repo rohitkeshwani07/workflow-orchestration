@@ -30,11 +30,37 @@ This is a monorepo with:
 
 ## Prerequisites
 
+**For Docker (Recommended):**
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+
+**For Local Development:**
 - Go >= 1.21
 - Node.js >= 18.0.0
 - npm or yarn
 
 ## Quick Start
+
+### Option 1: Docker (Recommended)
+
+1. **Configure environment**:
+```bash
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
+```
+
+2. **Start with Docker Compose**:
+```bash
+docker-compose up -d
+```
+
+3. **Access the application**:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+
+See [DOCKER.md](DOCKER.md) for detailed Docker documentation.
+
+### Option 2: Local Development
 
 1. **Install Go dependencies**:
 ```bash
@@ -71,6 +97,12 @@ Navigate to http://localhost:3000
 
 ## Building for Production
 
+### Docker (Recommended)
+```bash
+docker-compose up --build -d
+```
+
+### Manual Build
 ```bash
 # Build everything
 npm run build
@@ -301,7 +333,27 @@ make build     # Build binary
 make run       # Run built binary
 ```
 
+## Deployment
+
+### Docker Deployment (Recommended)
+See [DOCKER.md](DOCKER.md) for complete Docker deployment guide including:
+- Production configuration
+- Data persistence and backups
+- Scaling and load balancing
+- Security best practices
+- Monitoring and logging
+
+### Manual Deployment
+1. Build the Go binary: `cd backend && make build`
+2. Build the frontend: `cd packages/frontend && npm run build`
+3. Deploy binary and static files to your server
+4. Set up reverse proxy (Nginx/Caddy) for HTTPS
+5. Configure systemd service for backend process
+
 ## Troubleshooting
+
+### Docker Issues
+See [DOCKER.md](DOCKER.md) troubleshooting section for Docker-specific issues.
 
 ### WebSocket Connection Issues
 - Ensure backend is running on port 3001

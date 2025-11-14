@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.git/
+.env
+.env.local
+*.log
+backend/data/
+backend/bin/
+packages/frontend/dist/
+packages/frontend/node_modules/

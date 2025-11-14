@@ -1,0 +1,9 @@
+data/
+bin/
+*.db
+*.sqlite
+.env
+.git
+.gitignore
+README.md
+Makefile
