@@ -61,9 +61,12 @@ func New(config Config) (*DB, error) {
 
 	db := &DB{conn: conn}
 
-	// Auto-migrate schemas
-	if err := db.autoMigrate(); err != nil {
-		return nil, fmt.Errorf("failed to migrate database: %w", err)
+	// Note: Migrations are now handled separately via migrate tool
+	// Auto-migrate is kept as fallback for development
+	if os.Getenv("AUTO_MIGRATE") == "true" {
+		if err := db.autoMigrate(); err != nil {
+			return nil, fmt.Errorf("failed to auto-migrate database: %w", err)
+		}
 	}
 
 	return db, nil

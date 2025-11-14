@@ -16,6 +16,9 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o workflow-server main.go
 
+# Build migration tool
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o migrate cmd/migrate/main.go
+
 # Runtime stage
 FROM alpine:latest
 
@@ -24,8 +27,12 @@ RUN apk --no-cache add ca-certificates sqlite-libs
 
 WORKDIR /root/
 
-# Copy the binary from builder
+# Copy the binaries from builder
 COPY --from=builder /app/workflow-server .
+COPY --from=builder /app/migrate .
+
+# Copy migrations
+COPY --from=builder /app/migrations ./migrations
 
 # Create data directory
 RUN mkdir -p /root/data

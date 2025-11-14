@@ -263,18 +263,20 @@ return { words: processed, count: processed.length };
 
 ## Database
 
-The application uses **GORM** as the ORM and supports multiple databases:
+The application uses **GORM** as the ORM with **golang-migrate** for schema migrations:
 - **PostgreSQL** (default, recommended for production)
 - **SQLite** (alternative, good for development)
+- **Automatic migrations** via Docker Compose
+- **Version-controlled schema** in `backend/migrations/`
 
-Database tables (auto-migrated by GORM):
+Database tables:
 - `workflows`: Workflow definitions
 - `executions`: Workflow execution records
 - `execution_logs`: Node execution logs
 - `chat_sessions`: Chat sessions
 - `chat_messages`: Chat message history
 
-See [DATABASE.md](DATABASE.md) for complete database configuration guide.
+See [DATABASE.md](DATABASE.md) for database configuration and [MIGRATIONS.md](MIGRATIONS.md) for migration guide.
 
 ## Development
 
@@ -334,10 +336,16 @@ func (ne *NodeExecutor) executeMyNewNode(node *models.Node, ctx map[string]inter
 
 ```bash
 cd backend
-make deps      # Download Go dependencies
-make dev       # Run in development mode
-make build     # Build binary
-make run       # Run built binary
+make deps           # Download Go dependencies
+make migrate-up     # Run database migrations
+make dev            # Run in development mode
+make build          # Build binary
+make run            # Run built binary
+
+# Migration commands
+make migrate-up      # Apply pending migrations
+make migrate-down    # Rollback last migration
+make migrate-version # Check migration version
 ```
 
 ## Deployment

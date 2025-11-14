@@ -30,11 +30,25 @@ docker-compose up -d
 
 ## Docker Compose Services
 
+### PostgreSQL Service
+- **Container**: `workflow-postgres`
+- **Port**: 5432
+- **Technology**: PostgreSQL 16 Alpine
+- **Volume**: `postgres-data` for data persistence
+- **Health checks**: Ensures database is ready before migrations
+
+### Migration Service
+- **Container**: `workflow-migrate`
+- **Technology**: golang-migrate
+- **Runs**: Automatically before backend starts
+- **Function**: Applies pending database migrations
+- **Restart**: On failure (handles transient connection issues)
+
 ### Backend Service
 - **Container**: `workflow-backend`
 - **Port**: 3001
-- **Technology**: Go 1.21 + Gin + SQLite
-- **Volume**: `workflow-data` mounted at `/root/data` for database persistence
+- **Technology**: Go 1.21 + Gin + GORM + PostgreSQL
+- **Depends on**: migrate service (waits for migrations to complete)
 
 ### Frontend Service
 - **Container**: `workflow-frontend`
