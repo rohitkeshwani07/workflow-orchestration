@@ -6,6 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.40.3
+	github.com/aws/aws-sdk-go v1.50.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/google/uuid v1.5.0

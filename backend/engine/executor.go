@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/workflow-orchestration/backend/database"
+	lambdaexec "github.com/workflow-orchestration/backend/lambda"
 	"github.com/workflow-orchestration/backend/models"
 )
 
@@ -19,6 +21,7 @@ type NodeExecutor struct {
 	db                      *database.DB
 	anthropicAPIKey         string
 	credentialsServiceURL   string
+	lambdaExecutor          *lambdaexec.LambdaExecutor
 }
 
 func NewNodeExecutor(db *database.DB, anthropicAPIKey string) *NodeExecutor {
@@ -27,10 +30,25 @@ func NewNodeExecutor(db *database.DB, anthropicAPIKey string) *NodeExecutor {
 		credentialsServiceURL = "http://localhost:3002"
 	}
 
+	// Initialize Lambda executor
+	lambdaExec, err := lambdaexec.NewLambdaExecutor()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Lambda executor: %v", err)
+		lambdaExec = nil
+	} else {
+		// Test connection
+		if err := lambdaExec.TestConnection(); err != nil {
+			log.Printf("Warning: Lambda connection test failed: %v", err)
+		} else {
+			log.Println("Lambda executor initialized successfully")
+		}
+	}
+
 	return &NodeExecutor{
 		db:                    db,
 		anthropicAPIKey:       anthropicAPIKey,
 		credentialsServiceURL: credentialsServiceURL,
+		lambdaExecutor:        lambdaExec,
 	}
 }
 
@@ -410,11 +428,46 @@ func (ne *NodeExecutor) executeCode(node *models.Node, ctx map[string]interface{
 		return nil, fmt.Errorf("code is required")
 	}
 
-	// In a production system, use a JS runtime like goja or otto
-	return map[string]interface{}{
-		"code": code,
-		"note": "Code execution not fully implemented in Go version",
-	}, nil
+	// Get language (default to javascript)
+	language := "javascript"
+	if lang, ok := node.Data["language"].(string); ok && lang != "" {
+		language = lang
+	}
+
+	// If Lambda executor is not available, return error
+	if ne.lambdaExecutor == nil {
+		return nil, fmt.Errorf("Lambda executor not available - code execution disabled")
+	}
+
+	// Execute code in Lambda
+	log.Printf("Executing %s code in Lambda", language)
+	response, err := ne.lambdaExecutor.ExecuteCode(code, language, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Lambda execution failed: %w", err)
+	}
+
+	// Check if execution was successful
+	if !response.Success {
+		errorMsg := response.Error
+		if response.Stack != "" {
+			errorMsg += "\n" + response.Stack
+		}
+		if response.Traceback != "" {
+			errorMsg += "\n" + response.Traceback
+		}
+		return nil, fmt.Errorf("code execution error: %s", errorMsg)
+	}
+
+	// Return result
+	result := map[string]interface{}{
+		"success":    true,
+		"result":     response.Result,
+		"output":     response.Output,
+		"executedAt": response.ExecutedAt,
+		"language":   language,
+	}
+
+	return result, nil
 }
 
 func (ne *NodeExecutor) executeDelay(node *models.Node, ctx map[string]interface{}) (interface{}, error) {

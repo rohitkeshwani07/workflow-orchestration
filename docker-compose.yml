@@ -59,12 +59,19 @@ services:
       - CLICKHOUSE_DB=logs
       - CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
+      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - USE_LOCALSTACK=${USE_LOCALSTACK:-true}
     depends_on:
       migrate:
         condition: service_completed_successfully
       credentials:
         condition: service_healthy
       clickhouse:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -153,6 +160,35 @@ services:
       timeout: 5s
       retries: 5
 
+  localstack:
+    image: localstack/localstack:latest
+    container_name: workflow-localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=lambda,s3,iam
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=docker-reuse
+      - LAMBDA_REMOTE_DOCKER=false
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LAMBDA_DOCKER_NETWORK=workflow-orchestration_default
+      - PERSISTENCE=1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./lambda:/etc/localstack/init/ready.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "awslocal", "lambda", "list-functions"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   ai-agent:
     build:
       context: ./ai-agent-service
@@ -217,4 +253,6 @@ volumes:
   redis-data:
     driver: local
   clickhouse-data:
+    driver: local
+  localstack-data:
     driver: local
