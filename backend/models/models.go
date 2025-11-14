@@ -31,12 +31,18 @@ func (j *JSON) Scan(value interface{}) error {
 		*j = JSON("null")
 		return nil
 	}
-	bytes, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+
+	// Handle both []byte and string types
+	switch v := value.(type) {
+	case []byte:
+		*j = JSON(v)
+		return nil
+	case string:
+		*j = JSON(v)
+		return nil
+	default:
+		return errors.New("type assertion failed: expected []byte or string")
 	}
-	*j = JSON(bytes)
-	return nil
 }
 
 // Value implements driver.Valuer interface
