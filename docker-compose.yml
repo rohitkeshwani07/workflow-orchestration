@@ -54,9 +54,12 @@ services:
       - DB_NAME=${DB_NAME:-workflows}
       - DB_SSLMODE=${DB_SSLMODE:-disable}
       - AUTO_MIGRATE=${AUTO_MIGRATE:-false}
+      - CREDENTIALS_SERVICE_URL=http://credentials:3002
     depends_on:
       migrate:
         condition: service_completed_successfully
+      credentials:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test:
@@ -67,6 +70,42 @@ services:
           "--tries=1",
           "--spider",
           "http://localhost:3001/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  credentials:
+    build:
+      context: ./credentials-service
+      dockerfile: Dockerfile
+    container_name: workflow-credentials
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - DB_DRIVER=${DB_DRIVER:-postgres}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-workflow}
+      - DB_PASSWORD=${DB_PASSWORD:-workflow_password}
+      - DB_NAME=${DB_NAME:-workflows}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3002/health",
         ]
       interval: 30s
       timeout: 10s

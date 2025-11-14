@@ -97,13 +97,11 @@ func main() {
 			workflows.GET("/:id/executions/:executionId", handler.GetExecutionDetails)
 		}
 
+		// Proxy all credentials requests to credentials service
 		credentials := api.Group("/credentials")
 		{
-			credentials.GET("", handler.GetAllCredentials)
-			credentials.GET("/:id", handler.GetCredential)
-			credentials.POST("", handler.CreateCredential)
-			credentials.PUT("/:id", handler.UpdateCredential)
-			credentials.DELETE("/:id", handler.DeleteCredential)
+			credentials.Any("", handler.ProxyToCredentialsService)
+			credentials.Any("/:id", handler.ProxyToCredentialsService)
 		}
 
 		templates := api.Group("/templates")

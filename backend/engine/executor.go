@@ -6,48 +6,78 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/models"
-	"github.com/workflow-orchestration/backend/utils"
 )
 
 type NodeExecutor struct {
-	db              *database.DB
-	anthropicAPIKey string
+	db                      *database.DB
+	anthropicAPIKey         string
+	credentialsServiceURL   string
 }
 
 func NewNodeExecutor(db *database.DB, anthropicAPIKey string) *NodeExecutor {
+	credentialsServiceURL := os.Getenv("CREDENTIALS_SERVICE_URL")
+	if credentialsServiceURL == "" {
+		credentialsServiceURL = "http://localhost:3002"
+	}
+
 	return &NodeExecutor{
-		db:              db,
-		anthropicAPIKey: anthropicAPIKey,
+		db:                    db,
+		anthropicAPIKey:       anthropicAPIKey,
+		credentialsServiceURL: credentialsServiceURL,
 	}
 }
 
-// getCredentialValue retrieves and decrypts a credential value by ID
+// getCredentialValue retrieves and decrypts a credential value by ID from credentials service
 func (ne *NodeExecutor) getCredentialValue(credentialID string) (string, error) {
 	if credentialID == "" {
 		return "", nil
 	}
 
-	credential, err := ne.db.GetCredential(credentialID)
+	// Call credentials service
+	url := fmt.Sprintf("%s/api/credentials/%s", ne.credentialsServiceURL, credentialID)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to get credential: %w", err)
-	}
-	if credential == nil {
-		return "", fmt.Errorf("credential not found: %s", credentialID)
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Decrypt the value
-	decryptedValue, err := utils.Decrypt(credential.EncryptedValue)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to decrypt credential: %w", err)
+		return "", fmt.Errorf("failed to fetch credential from service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("credential service returned status %d", resp.StatusCode)
 	}
 
-	return decryptedValue, nil
+	var result struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Value string `json:"value"`
+		} `json:"data"`
+		Error *string `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode credential response: %w", err)
+	}
+
+	if !result.Success {
+		if result.Error != nil {
+			return "", fmt.Errorf("credential service error: %s", *result.Error)
+		}
+		return "", fmt.Errorf("credential service returned unsuccessful response")
+	}
+
+	return result.Data.Value, nil
 }
 
 func (ne *NodeExecutor) Execute(node *models.Node, ctx map[string]interface{}) (interface{}, error) {

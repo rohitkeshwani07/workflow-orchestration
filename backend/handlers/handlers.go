@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +11,6 @@ import (
 	"github.com/workflow-orchestration/backend/database"
 	"github.com/workflow-orchestration/backend/engine"
 	"github.com/workflow-orchestration/backend/models"
-	"github.com/workflow-orchestration/backend/utils"
 )
 
 type Handler struct {
@@ -283,219 +284,57 @@ func (h *Handler) GetExecutionDetails(c *gin.Context) {
 	})
 }
 
-// GetAllCredentials handles GET /api/credentials
-func (h *Handler) GetAllCredentials(c *gin.Context) {
-	credentials, err := h.db.GetAllCredentials()
+// Credentials proxy handlers - forward to credentials service
+func (h *Handler) ProxyToCredentialsService(c *gin.Context) {
+	credentialsServiceURL := os.Getenv("CREDENTIALS_SERVICE_URL")
+	if credentialsServiceURL == "" {
+		credentialsServiceURL = "http://localhost:3002"
+	}
+
+	// Build target URL
+	targetURL := credentialsServiceURL + c.Request.URL.Path
+
+	// Create request to credentials service
+	req, err := http.NewRequest(c.Request.Method, targetURL, c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{
 			Success: false,
-			Error:   stringPtr(err.Error()),
+			Error:   stringPtr("Failed to create proxy request"),
 		})
 		return
 	}
 
-	// Never return decrypted values in list view
-	for i := range credentials {
-		credentials[i].DecryptedValue = ""
-	}
-
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    credentials,
-	})
-}
-
-// GetCredential handles GET /api/credentials/:id
-func (h *Handler) GetCredential(c *gin.Context) {
-	id := c.Param("id")
-
-	credential, err := h.db.GetCredential(id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
-	}
-
-	if credential == nil {
-		c.JSON(http.StatusNotFound, models.APIResponse{
-			Success: false,
-			Error:   stringPtr("Credential not found"),
-		})
-		return
-	}
-
-	// Decrypt value for retrieval
-	decryptedValue, err := utils.Decrypt(credential.EncryptedValue)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr("Failed to decrypt credential"),
-		})
-		return
-	}
-	credential.DecryptedValue = decryptedValue
-
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    credential,
-	})
-}
-
-// CreateCredential handles POST /api/credentials
-func (h *Handler) CreateCredential(c *gin.Context) {
-	var req struct {
-		Name        string                 `json:"name"`
-		Type        models.CredentialType  `json:"type"`
-		Description *string                `json:"description"`
-		Value       string                 `json:"value"`
-		Metadata    map[string]interface{} `json:"metadata"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
-	}
-
-	// Encrypt the value
-	encryptedValue, err := utils.Encrypt(req.Value)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr("Failed to encrypt credential"),
-		})
-		return
-	}
-
-	now := time.Now()
-	credential := &models.Credential{
-		ID:             uuid.New().String(),
-		Name:           req.Name,
-		Type:           req.Type,
-		Description:    req.Description,
-		EncryptedValue: encryptedValue,
-		Metadata:       req.Metadata,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-
-	if err := h.db.CreateCredential(credential); err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
-	}
-
-	// Don't return encrypted value
-	credential.DecryptedValue = ""
-
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    credential,
-	})
-}
-
-// UpdateCredential handles PUT /api/credentials/:id
-func (h *Handler) UpdateCredential(c *gin.Context) {
-	id := c.Param("id")
-
-	existing, err := h.db.GetCredential(id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
-	}
-
-	if existing == nil {
-		c.JSON(http.StatusNotFound, models.APIResponse{
-			Success: false,
-			Error:   stringPtr("Credential not found"),
-		})
-		return
-	}
-
-	var req struct {
-		Name        *string                `json:"name"`
-		Type        *models.CredentialType `json:"type"`
-		Description *string                `json:"description"`
-		Value       *string                `json:"value"`
-		Metadata    map[string]interface{} `json:"metadata"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
-	}
-
-	// Update fields
-	if req.Name != nil {
-		existing.Name = *req.Name
-	}
-	if req.Type != nil {
-		existing.Type = *req.Type
-	}
-	if req.Description != nil {
-		existing.Description = req.Description
-	}
-	if req.Value != nil {
-		// Re-encrypt the new value
-		encryptedValue, err := utils.Encrypt(*req.Value)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.APIResponse{
-				Success: false,
-				Error:   stringPtr("Failed to encrypt credential"),
-			})
-			return
+	// Copy headers
+	for key, values := range c.Request.Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
 		}
-		existing.EncryptedValue = encryptedValue
 	}
-	if req.Metadata != nil {
-		existing.Metadata = req.Metadata
-	}
-	existing.UpdatedAt = time.Now()
 
-	if err := h.db.UpdateCredential(existing); err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
+	// Send request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, models.APIResponse{
 			Success: false,
-			Error:   stringPtr(err.Error()),
+			Error:   stringPtr("Failed to reach credentials service"),
 		})
 		return
 	}
+	defer resp.Body.Close()
 
-	// Don't return encrypted value
-	existing.DecryptedValue = ""
-
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-		Data:    existing,
-	})
-}
-
-// DeleteCredential handles DELETE /api/credentials/:id
-func (h *Handler) DeleteCredential(c *gin.Context) {
-	id := c.Param("id")
-
-	if err := h.db.DeleteCredential(id); err != nil {
-		c.JSON(http.StatusInternalServerError, models.APIResponse{
-			Success: false,
-			Error:   stringPtr(err.Error()),
-		})
-		return
+	// Copy response headers
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Writer.Header().Add(key, value)
+		}
 	}
 
-	c.JSON(http.StatusOK, models.APIResponse{
-		Success: true,
-	})
+	// Copy status code
+	c.Status(resp.StatusCode)
+
+	// Copy response body
+	io.Copy(c.Writer, resp.Body)
 }
 
 // GetAllWorkflowTemplates handles GET /api/templates
