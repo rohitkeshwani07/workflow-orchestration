@@ -83,7 +83,7 @@ func main() {
 			workflows.DELETE("/:id", handler.DeleteWorkflow)
 			workflows.POST("/:id/execute", handler.ExecuteWorkflow)
 			workflows.GET("/:id/executions", handler.GetWorkflowExecutions)
-			workflows.GET("/:workflowId/executions/:executionId", handler.GetExecutionDetails)
+			workflows.GET("/:id/executions/:executionId", handler.GetExecutionDetails)
 		}
 	}
 

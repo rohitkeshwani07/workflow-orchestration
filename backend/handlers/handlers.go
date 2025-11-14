@@ -243,7 +243,7 @@ func (h *Handler) GetWorkflowExecutions(c *gin.Context) {
 	})
 }
 
-// GetExecutionDetails handles GET /api/workflows/:workflowId/executions/:executionId
+// GetExecutionDetails handles GET /api/workflows/:id/executions/:executionId
 func (h *Handler) GetExecutionDetails(c *gin.Context) {
 	executionID := c.Param("executionId")
 

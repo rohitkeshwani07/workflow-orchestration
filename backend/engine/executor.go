@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
