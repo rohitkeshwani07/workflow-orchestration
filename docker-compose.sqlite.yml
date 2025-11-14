@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 # Alternative docker-compose for SQLite (lighter, single-file database)
 # Usage: docker-compose -f docker-compose.sqlite.yml up -d
@@ -20,7 +20,15 @@ services:
       - workflow-data:/root/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3001/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -28,8 +36,8 @@ services:
 
   frontend:
     build:
-      context: ./packages/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./packages/frontend/Dockerfile
     container_name: workflow-frontend
     ports:
       - "3000:80"
@@ -37,7 +45,15 @@ services:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

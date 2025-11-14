@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { MessageSquare, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { workflowApi } from '../api/workflows';
-import { Plus, Trash2, Play, MessageSquare } from 'lucide-react';
 
 export default function WorkflowList() {
   const navigate = useNavigate();
@@ -72,9 +72,8 @@ export default function WorkflowList() {
               <div onClick={() => navigate(`/workflows/${workflow.id}`)}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-medium text-gray-900 truncate">{workflow.name}</h3>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    workflow.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${workflow.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {workflow.active ? 'Active' : 'Inactive'}
                   </span>
                 </div>

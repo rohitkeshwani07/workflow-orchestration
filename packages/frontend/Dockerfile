@@ -3,34 +3,30 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy shared package first
-COPY ../../packages/shared /app/packages/shared
+# Copy root package files and workspace config
+COPY package.json package-lock.json* ./
 
-# Copy package files
-COPY package.json ./
-COPY ../../package.json /app/root-package.json
+# Copy all workspace packages
+COPY packages/shared ./packages/shared
+COPY packages/frontend ./packages/frontend
 
-# Install dependencies
-WORKDIR /app/packages/shared
+# Install all dependencies (npm workspaces will link them)
 RUN npm install
 
-WORKDIR /app
-RUN npm install
+# Build the shared package first
+RUN npm run build -w packages/shared
 
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
+# Build the frontend
+RUN npm run build -w packages/frontend
 
 # Runtime stage - Nginx to serve static files
 FROM nginx:alpine
 
-# Copy built files
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built files from the frontend workspace
+COPY --from=builder /app/packages/frontend/dist /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY packages/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
