@@ -18,7 +18,7 @@ A powerful workflow orchestration system similar to n8n, featuring AI agent inte
   - Response: Send responses back to chat
 - **Workflow Execution Engine**: Reliable execution with state management
 - **Execution Monitoring**: Track workflow runs and view logs
-- **SQLite Database**: Persistent storage for workflows and execution history
+- **Flexible Database**: PostgreSQL or SQLite with GORM (easily switchable)
 
 ## Architecture
 
@@ -248,7 +248,8 @@ return { words: processed, count: processed.length };
 - **Go 1.21+**
 - Gin (HTTP framework)
 - Gorilla WebSocket
-- SQLite3 (Database)
+- GORM (ORM with PostgreSQL/SQLite support)
+- PostgreSQL 16 or SQLite3
 - Anthropic API (AI integration)
 
 ### Frontend
@@ -260,14 +261,20 @@ return { words: processed, count: processed.length };
 - Tailwind CSS (Styling)
 - Zustand (State management)
 
-## Database Schema
+## Database
 
-The SQLite database includes tables for:
+The application uses **GORM** as the ORM and supports multiple databases:
+- **PostgreSQL** (default, recommended for production)
+- **SQLite** (alternative, good for development)
+
+Database tables (auto-migrated by GORM):
 - `workflows`: Workflow definitions
 - `executions`: Workflow execution records
 - `execution_logs`: Node execution logs
 - `chat_sessions`: Chat sessions
 - `chat_messages`: Chat message history
+
+See [DATABASE.md](DATABASE.md) for complete database configuration guide.
 
 ## Development
 

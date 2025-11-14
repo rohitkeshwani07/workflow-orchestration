@@ -26,15 +26,10 @@ func main() {
 		port = "3001"
 	}
 
-	dbPath := os.Getenv("DATABASE_PATH")
-	if dbPath == "" {
-		dbPath = "./data/workflows.db"
-	}
-
 	anthropicAPIKey := os.Getenv("ANTHROPIC_API_KEY")
 
 	// Initialize database
-	db, err := database.New(dbPath)
+	db, err := database.NewFromEnv()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}

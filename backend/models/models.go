@@ -1,6 +1,13 @@
 package models
 
-import "time"
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type NodeType string
 
@@ -15,6 +22,48 @@ const (
 	NodeTypeResponse     NodeType = "response"
 )
 
+// JSON type for GORM
+type JSON json.RawMessage
+
+// Scan implements sql.Scanner interface
+func (j *JSON) Scan(value interface{}) error {
+	if value == nil {
+		*j = JSON("null")
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+	*j = JSON(bytes)
+	return nil
+}
+
+// Value implements driver.Valuer interface
+func (j JSON) Value() (driver.Value, error) {
+	if len(j) == 0 {
+		return nil, nil
+	}
+	return []byte(j), nil
+}
+
+// MarshalJSON for json encoding
+func (j JSON) MarshalJSON() ([]byte, error) {
+	if len(j) == 0 {
+		return []byte("null"), nil
+	}
+	return []byte(j), nil
+}
+
+// UnmarshalJSON for json decoding
+func (j *JSON) UnmarshalJSON(data []byte) error {
+	if j == nil {
+		return errors.New("JSON: UnmarshalJSON on nil pointer")
+	}
+	*j = append((*j)[0:0], data...)
+	return nil
+}
+
 type Position struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
@@ -23,8 +72,29 @@ type Position struct {
 type Node struct {
 	ID       string                 `json:"id"`
 	Type     NodeType               `json:"type"`
-	Position Position               `json:"position"`
-	Data     map[string]interface{} `json:"data"`
+	Position Position               `json:"position" gorm:"embedded;embeddedPrefix:position_"`
+	Data     map[string]interface{} `json:"data" gorm:"-"`
+	DataJSON JSON                   `json:"-" gorm:"column:data"`
+}
+
+// BeforeSave hook to convert Data to JSON
+func (n *Node) BeforeSave(tx *gorm.DB) error {
+	if n.Data != nil {
+		data, err := json.Marshal(n.Data)
+		if err != nil {
+			return err
+		}
+		n.DataJSON = JSON(data)
+	}
+	return nil
+}
+
+// AfterFind hook to convert JSON to Data
+func (n *Node) AfterFind(tx *gorm.DB) error {
+	if len(n.DataJSON) > 0 {
+		return json.Unmarshal(n.DataJSON, &n.Data)
+	}
+	return nil
 }
 
 type Edge struct {
@@ -36,14 +106,55 @@ type Edge struct {
 }
 
 type Workflow struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
+	ID          string    `json:"id" gorm:"primaryKey"`
+	Name        string    `json:"name" gorm:"not null"`
 	Description *string   `json:"description,omitempty"`
-	Nodes       []Node    `json:"nodes"`
-	Edges       []Edge    `json:"edges"`
-	Active      bool      `json:"active"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	Nodes       []Node    `json:"nodes" gorm:"-"`
+	NodesJSON   JSON      `json:"-" gorm:"column:nodes"`
+	Edges       []Edge    `json:"edges" gorm:"-"`
+	EdgesJSON   JSON      `json:"-" gorm:"column:edges"`
+	Active      bool      `json:"active" gorm:"default:false"`
+	CreatedAt   time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+}
+
+// TableName overrides the table name
+func (Workflow) TableName() string {
+	return "workflows"
+}
+
+// BeforeSave hook
+func (w *Workflow) BeforeSave(tx *gorm.DB) error {
+	if w.Nodes != nil {
+		nodes, err := json.Marshal(w.Nodes)
+		if err != nil {
+			return err
+		}
+		w.NodesJSON = JSON(nodes)
+	}
+	if w.Edges != nil {
+		edges, err := json.Marshal(w.Edges)
+		if err != nil {
+			return err
+		}
+		w.EdgesJSON = JSON(edges)
+	}
+	return nil
+}
+
+// AfterFind hook
+func (w *Workflow) AfterFind(tx *gorm.DB) error {
+	if len(w.NodesJSON) > 0 {
+		if err := json.Unmarshal(w.NodesJSON, &w.Nodes); err != nil {
+			return err
+		}
+	}
+	if len(w.EdgesJSON) > 0 {
+		if err := json.Unmarshal(w.EdgesJSON, &w.Edges); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type ExecutionStatus string
@@ -56,37 +167,78 @@ const (
 )
 
 type Execution struct {
-	ID         string                 `json:"id"`
-	WorkflowID string                 `json:"workflowId"`
-	Status     ExecutionStatus        `json:"status"`
-	StartedAt  time.Time              `json:"startedAt"`
-	FinishedAt *time.Time             `json:"finishedAt,omitempty"`
-	Error      *string                `json:"error,omitempty"`
-	Context    map[string]interface{} `json:"context"`
+	ID          string                 `json:"id" gorm:"primaryKey"`
+	WorkflowID  string                 `json:"workflowId" gorm:"not null;index"`
+	Status      ExecutionStatus        `json:"status" gorm:"not null"`
+	StartedAt   time.Time              `json:"startedAt" gorm:"not null"`
+	FinishedAt  *time.Time             `json:"finishedAt,omitempty"`
+	Error       *string                `json:"error,omitempty"`
+	Context     map[string]interface{} `json:"context" gorm:"-"`
+	ContextJSON JSON                   `json:"-" gorm:"column:context"`
+}
+
+// TableName overrides the table name
+func (Execution) TableName() string {
+	return "executions"
+}
+
+// BeforeSave hook
+func (e *Execution) BeforeSave(tx *gorm.DB) error {
+	if e.Context != nil {
+		ctx, err := json.Marshal(e.Context)
+		if err != nil {
+			return err
+		}
+		e.ContextJSON = JSON(ctx)
+	}
+	return nil
+}
+
+// AfterFind hook
+func (e *Execution) AfterFind(tx *gorm.DB) error {
+	if len(e.ContextJSON) > 0 {
+		return json.Unmarshal(e.ContextJSON, &e.Context)
+	}
+	return nil
 }
 
 type NodeExecutionLog struct {
-	ID          int       `json:"id"`
-	ExecutionID string    `json:"executionId"`
-	NodeID      string    `json:"nodeId"`
-	Status      string    `json:"status"`
+	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	ExecutionID string    `json:"executionId" gorm:"not null;index"`
+	NodeID      string    `json:"nodeId" gorm:"not null"`
+	Status      string    `json:"status" gorm:"not null"`
 	Output      *string   `json:"output,omitempty"`
 	Error       *string   `json:"error,omitempty"`
-	ExecutedAt  time.Time `json:"executedAt"`
+	ExecutedAt  time.Time `json:"executedAt" gorm:"not null"`
+}
+
+// TableName overrides the table name
+func (NodeExecutionLog) TableName() string {
+	return "execution_logs"
 }
 
 type ChatSession struct {
-	ID         string    `json:"id"`
-	WorkflowID string    `json:"workflowId"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID         string    `json:"id" gorm:"primaryKey"`
+	WorkflowID string    `json:"workflowId" gorm:"not null;index"`
+	CreatedAt  time.Time `json:"createdAt" gorm:"autoCreateTime"`
+}
+
+// TableName overrides the table name
+func (ChatSession) TableName() string {
+	return "chat_sessions"
 }
 
 type ChatMessage struct {
-	ID        string    `json:"id"`
-	SessionID string    `json:"sessionId"`
-	Role      string    `json:"role"` // user, assistant, system
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
+	ID        string    `json:"id" gorm:"primaryKey"`
+	SessionID string    `json:"sessionId" gorm:"not null;index"`
+	Role      string    `json:"role" gorm:"not null"` // user, assistant, system
+	Content   string    `json:"content" gorm:"not null"`
+	Timestamp time.Time `json:"timestamp" gorm:"not null"`
+}
+
+// TableName overrides the table name
+func (ChatMessage) TableName() string {
+	return "chat_messages"
 }
 
 type APIResponse struct {
