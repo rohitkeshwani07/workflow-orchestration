@@ -1,6 +1,6 @@
 # Workflow Orchestration Platform
 
-A powerful workflow orchestration system similar to n8n, featuring AI agent integration and real-time chat triggers.
+A powerful workflow orchestration system similar to n8n, featuring AI agent integration and real-time chat triggers. Built with Go backend and React frontend.
 
 ## Features
 
@@ -22,49 +22,65 @@ A powerful workflow orchestration system similar to n8n, featuring AI agent inte
 
 ## Architecture
 
-This is a monorepo with three packages:
+This is a monorepo with:
 
-- `packages/backend`: Node.js/Express API server with workflow engine
-- `packages/frontend`: React/TypeScript UI with React Flow
-- `packages/shared`: Shared TypeScript types and schemas
+- `backend/`: Go API server with workflow engine
+- `packages/frontend/`: React/TypeScript UI with React Flow
+- `packages/shared/`: Shared TypeScript types and schemas
 
 ## Prerequisites
 
+- Go >= 1.21
 - Node.js >= 18.0.0
 - npm or yarn
 
 ## Quick Start
 
-1. **Install dependencies**:
+1. **Install Go dependencies**:
+```bash
+cd backend
+go mod download
+cd ..
+```
+
+2. **Install frontend dependencies**:
 ```bash
 npm install
 ```
 
-2. **Configure environment variables**:
+3. **Configure environment variables**:
 ```bash
-cd packages/backend
+cd backend
 cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY
+cd ..
 ```
 
-3. **Start development servers**:
+4. **Start development servers**:
 ```bash
 # From root directory
 npm run dev
 ```
 
 This will start:
-- Backend API on http://localhost:3001
-- Frontend UI on http://localhost:3000
+- Go Backend API on http://localhost:3001
+- React Frontend UI on http://localhost:3000
 
-4. **Open your browser**:
+5. **Open your browser**:
 Navigate to http://localhost:3000
 
 ## Building for Production
 
 ```bash
+# Build everything
 npm run build
-npm start
+
+# Run backend
+cd backend
+./bin/workflow-server
+
+# Serve frontend (use your preferred static file server)
+cd ../packages/frontend/dist
 ```
 
 ## Creating Your First Workflow
@@ -197,11 +213,11 @@ return { words: processed, count: processed.length };
 ## Technology Stack
 
 ### Backend
-- Node.js + Express
-- TypeScript
-- better-sqlite3 (Database)
-- ws (WebSocket)
-- Anthropic SDK (AI)
+- **Go 1.21+**
+- Gin (HTTP framework)
+- Gorilla WebSocket
+- SQLite3 (Database)
+- Anthropic API (AI integration)
 
 ### Frontend
 - React 18
@@ -226,15 +242,16 @@ The SQLite database includes tables for:
 ### Project Structure
 ```
 workflow-orchestration/
+├── backend/
+│   ├── database/           # SQLite database layer
+│   ├── engine/             # Workflow execution engine
+│   ├── handlers/           # HTTP API handlers
+│   ├── models/             # Data models
+│   ├── websocket/          # WebSocket server
+│   ├── main.go             # Entry point
+│   ├── go.mod              # Go dependencies
+│   └── Makefile            # Build commands
 ├── packages/
-│   ├── backend/
-│   │   ├── src/
-│   │   │   ├── engine/         # Workflow execution engine
-│   │   │   ├── routes/         # API routes
-│   │   │   ├── database.ts     # Database layer
-│   │   │   ├── websocket.ts    # WebSocket server
-│   │   │   └── index.ts        # Entry point
-│   │   └── package.json
 │   ├── frontend/
 │   │   ├── src/
 │   │   │   ├── components/     # React components
@@ -250,24 +267,39 @@ workflow-orchestration/
 
 ### Adding New Node Types
 
-1. Add node type to `packages/shared/src/types.ts`:
-```typescript
-export enum NodeType {
+1. Add node type to `backend/models/models.go`:
+```go
+const (
   // ... existing types
-  MY_NEW_NODE = 'my_new_node'
-}
+  NodeTypeMyNewNode NodeType = "my_new_node"
+)
 ```
 
-2. Implement execution logic in `packages/backend/src/engine/NodeExecutor.ts`
+2. Implement execution logic in `backend/engine/executor.go`:
+```go
+func (ne *NodeExecutor) executeMyNewNode(node *models.Node, ctx map[string]interface{}) (interface{}, error) {
+  // Your implementation
+}
+```
 
 3. Add UI component in frontend node palette and config panel
 
 ## Environment Variables
 
-### Backend
+### Backend (.env in backend/ directory)
 - `PORT`: Server port (default: 3001)
-- `ANTHROPIC_API_KEY`: Your Anthropic API key
+- `ANTHROPIC_API_KEY`: Your Anthropic API key (required for AI nodes)
 - `DATABASE_PATH`: SQLite database path (default: ./data/workflows.db)
+
+## Running Backend Separately
+
+```bash
+cd backend
+make deps      # Download Go dependencies
+make dev       # Run in development mode
+make build     # Build binary
+make run       # Run built binary
+```
 
 ## Troubleshooting
 
@@ -282,9 +314,14 @@ export enum NodeType {
 - Ensure AI API key is configured correctly
 
 ### Database Issues
-- Database is created automatically in `packages/backend/data/`
+- Database is created automatically in `backend/data/`
 - Delete database file to reset all data
 - Check file permissions for database directory
+
+### Go Build Issues
+- Ensure Go 1.21+ is installed: `go version`
+- Run `go mod download` in backend directory
+- On Linux, you may need to install gcc for SQLite: `apt-get install build-essential`
 
 ## Contributing
 

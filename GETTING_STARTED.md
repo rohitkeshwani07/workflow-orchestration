@@ -4,14 +4,20 @@ This guide will help you get up and running with the Workflow Orchestration plat
 
 ## Installation
 
-1. **Clone and install**:
+1. **Install dependencies**:
 ```bash
+# Install Go dependencies
+cd backend
+go mod download
+cd ..
+
+# Install frontend dependencies
 npm install
 ```
 
 2. **Set up your API key**:
 ```bash
-cd packages/backend
+cd backend
 cp .env.example .env
 ```
 
@@ -22,13 +28,13 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 3. **Start the application**:
 ```bash
-cd ../..  # Back to root
+cd ..  # Back to root
 npm run dev
 ```
 
 The application will start:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:3001
+- Go Backend: http://localhost:3001
+- React Frontend: http://localhost:3000
 
 ## Your First AI Chatbot Workflow
 
