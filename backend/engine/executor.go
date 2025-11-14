@@ -55,8 +55,13 @@ func (ne *NodeExecutor) executeChatTrigger(node *models.Node, ctx map[string]int
 }
 
 func (ne *NodeExecutor) executeAIAgent(node *models.Node, ctx map[string]interface{}) (interface{}, error) {
-	if ne.anthropicAPIKey == "" {
-		return nil, fmt.Errorf("Anthropic API key not configured")
+	// Use AI Agent Service instead of calling Anthropic directly
+	aiAgentServiceURL := "http://ai-agent:8000"
+
+	// Extract configuration
+	provider := "anthropic"
+	if p, ok := node.Data["provider"].(string); ok && p != "" {
+		provider = p
 	}
 
 	model := "claude-3-5-sonnet-20241022"
@@ -79,86 +84,140 @@ func (ne *NodeExecutor) executeAIAgent(node *models.Node, ctx map[string]interfa
 		maxTokens = int(mt)
 	}
 
-	// Build messages
-	messages := []map[string]interface{}{}
-
-	// Add user input from trigger
-	if trigger, ok := ctx["trigger"].(map[string]interface{}); ok {
-		if message, ok := trigger["message"].(string); ok {
-			messages = append(messages, map[string]interface{}{
-				"role":    "user",
-				"content": message,
-			})
-		}
+	// Memory configuration
+	memoryEnabled := true
+	if me, ok := node.Data["memoryEnabled"].(bool); ok {
+		memoryEnabled = me
 	}
 
-	// If no messages, add a default one
-	if len(messages) == 0 {
-		messages = append(messages, map[string]interface{}{
-			"role":    "user",
-			"content": "Hello",
-		})
+	maxMemoryMessages := 50
+	if mmm, ok := node.Data["maxMemoryMessages"].(float64); ok {
+		maxMemoryMessages = int(mmm)
 	}
 
-	// Build request
-	requestBody := map[string]interface{}{
-		"model":       model,
-		"max_tokens":  maxTokens,
-		"temperature": temperature,
-		"messages":    messages,
-	}
-
-	if systemPrompt != "" {
-		requestBody["system"] = systemPrompt
-	}
-
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", ne.anthropicAPIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Anthropic API error: %s", string(body))
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	// Extract text from response
-	text := ""
-	if content, ok := result["content"].([]interface{}); ok && len(content) > 0 {
-		if contentBlock, ok := content[0].(map[string]interface{}); ok {
-			if t, ok := contentBlock["text"].(string); ok {
-				text = t
+	// MCP Tools configuration
+	tools := []map[string]interface{}{}
+	if toolsData, ok := node.Data["tools"].([]interface{}); ok {
+		for _, t := range toolsData {
+			if tool, ok := t.(map[string]interface{}); ok {
+				tools = append(tools, tool)
 			}
 		}
 	}
 
+	// Get session ID from context (or generate one from workflow execution)
+	sessionID := ""
+	if trigger, ok := ctx["trigger"].(map[string]interface{}); ok {
+		if sid, ok := trigger["sessionId"].(string); ok {
+			sessionID = sid
+		}
+	}
+	if sessionID == "" {
+		// Use a session ID based on workflow execution context
+		if executionID, ok := ctx["executionId"].(string); ok {
+			sessionID = executionID
+		}
+	}
+
+	// Extract user message from trigger
+	userMessage := "Hello"
+	if trigger, ok := ctx["trigger"].(map[string]interface{}); ok {
+		if message, ok := trigger["message"].(string); ok {
+			userMessage = message
+		}
+	}
+
+	// Step 1: Create or update agent configuration
+	agentID := node.ID
+	agentConfig := map[string]interface{}{
+		"agent_id":            agentID,
+		"provider":            provider,
+		"model":               model,
+		"temperature":         temperature,
+		"max_tokens":          maxTokens,
+		"system_prompt":       systemPrompt,
+		"tools":               tools,
+		"memory_enabled":      memoryEnabled,
+		"max_memory_messages": maxMemoryMessages,
+	}
+
+	createAgentRequest := map[string]interface{}{
+		"agent_id": agentID,
+		"config":   agentConfig,
+	}
+
+	createAgentJSON, err := json.Marshal(createAgentRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal agent config: %w", err)
+	}
+
+	// Create/update agent (idempotent)
+	req, err := http.NewRequest("POST", aiAgentServiceURL+"/agents", bytes.NewBuffer(createAgentJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		// If agent service is down, return error
+		return nil, fmt.Errorf("AI Agent Service unavailable: %w", err)
+	}
+	resp.Body.Close()
+
+	// Step 2: Chat with agent
+	chatRequest := map[string]interface{}{
+		"agent_id":   agentID,
+		"message":    userMessage,
+		"session_id": sessionID,
+		"context":    ctx,
+	}
+
+	chatJSON, err := json.Marshal(chatRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal chat request: %w", err)
+	}
+
+	chatReq, err := http.NewRequest("POST", fmt.Sprintf("%s/agents/%s/chat", aiAgentServiceURL, agentID), bytes.NewBuffer(chatJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chat request: %w", err)
+	}
+	chatReq.Header.Set("Content-Type", "application/json")
+
+	chatResp, err := client.Do(chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to chat with agent: %w", err)
+	}
+	defer chatResp.Body.Close()
+
+	body, err := io.ReadAll(chatResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if chatResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AI Agent Service error (%d): %s", chatResp.StatusCode, string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Extract response text
+	responseText := ""
+	if response, ok := result["response"].(string); ok {
+		responseText = response
+	}
+
+	// Return in a format compatible with existing workflows
 	return map[string]interface{}{
-		"text":         text,
+		"text":         responseText,
+		"response":     responseText, // alias
+		"session_id":   result["session_id"],
+		"tool_calls":   result["tool_calls"],
+		"metadata":     result["metadata"],
 		"fullResponse": result,
 	}, nil
 }
